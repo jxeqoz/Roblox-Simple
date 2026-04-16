@@ -213,8 +213,8 @@ end))
 local stored = {}
 local heartbeatFrame = 0
 local ammoCache = {}
-
 local ammoValues = {}
+local createdBoxes = {}
 
 local function CollectAmmo(container)
     if not container then return end
@@ -282,6 +282,7 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                 box.Color3 = Color3.fromRGB(0, 255, 0)
                 box.Transparency = 0
                 box.Parent = root
+                table.insert(createdBoxes, box)
             end
         else
             if not isAlive then
@@ -329,8 +330,9 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
     end
 
     if heartbeatFrame % 6 == 0 then
-        for _, box in pairs(workspace:GetDescendants()) do
-            if box.Name == "HitboxOutline_VH" and box.Adornee then
+        local activeBoxes = {}
+        for _, box in pairs(createdBoxes) do
+            if box and box.Parent and box.Adornee then
                 local isPlayer = false
                 if box.Adornee.Parent then
                     for _, p in pairs(Players:GetPlayers()) do
@@ -340,6 +342,7 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                         end
                     end
                 end
+                
                 if not isPlayer then
                     pcall(function()
                         box.Adornee.Size = Vector3.new(0, 0, 0)
@@ -348,9 +351,12 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                         box.Adornee.Transparency = 1
                         box:Destroy()
                     end)
+                else
+                    table.insert(activeBoxes, box)
                 end
             end
         end
+        createdBoxes = activeBoxes
     end
 end))
 

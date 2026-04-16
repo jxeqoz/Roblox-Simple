@@ -63,6 +63,7 @@ MainBox:AddToggle("FOVCircle",{Text="FOV Circle",Default=false})
 MainBox:AddToggle("LockFOV",{Text="Lock FOV To Center",Default=true})
 MainBox:AddToggle("EnableHitbox",{Text="Hitbox Expander"})
 MainBox:AddToggle("CameraNoRecoil",{Text="Camera No Recoil"})
+MainBox:AddToggle("NoRecoil",{Text="Math Random Spread"})
 MainBox:AddToggle("InfiniteAmmo",{Text="Infinite Ammo"})
 
 MainBox:AddDropdown("TargetPart",{
@@ -176,6 +177,16 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         and Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
         or UIS:GetMouseLocation()
 
+    if Toggles.SpinBot and Toggles.SpinBot.Value and LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            spinAngle = spinAngle + math.rad(Options.SpinSpeed.Value)
+            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, spinAngle, 0)
+        end
+    end
+end))
+
+RunService:BindToRenderStep("AimbotAndRecoil_VH", Enum.RenderPriority.Camera.Value + 100, function()
     if Toggles.Aimbot.Value then
         local target = GetClosest()
         if target and target.Character then
@@ -202,15 +213,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         end
     end
     lastCamLook = Camera.CFrame.LookVector
-
-    if Toggles.SpinBot and Toggles.SpinBot.Value and LocalPlayer.Character then
-        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            spinAngle = spinAngle + math.rad(Options.SpinSpeed.Value)
-            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, spinAngle, 0)
-        end
-    end
-end))
+end)
 
 local stored = {}
 local heartbeatFrame = 0
@@ -535,6 +538,7 @@ UnloadBox:AddButton("Unload & Exit", function()
         workspace.CurrentCamera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     end
 
+    pcall(function() RunService:UnbindFromRenderStep("AimbotAndRecoil_VH") end)
     pcall(function() if oldRandom then hookfunction(math.random, oldRandom) end end)
     Library:Unload()
 end)

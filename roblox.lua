@@ -62,7 +62,6 @@ MainBox:AddToggle("LockFOV",{Text="Lock FOV To Center",Default=true})
 MainBox:AddToggle("EnableHitbox",{Text="Hitbox Expander"})
 MainBox:AddToggle("NoRecoil",{Text="No Recoil"})
 MainBox:AddToggle("InfiniteAmmo",{Text="Infinite Ammo"})
-MainBox:AddToggle("RapidFire",{Text="Rapid Fire"})
 
 MainBox:AddDropdown("TargetPart",{
     Values={"Head","HumanoidRootPart","Left Arm","Right Arm"},
@@ -82,7 +81,6 @@ fovCircle.Filled = false
 local Smoothness = 0.15
 local hitboxSize = 10
 local hitboxTransparency = 0.4
-local fireRate = 0.05
 
 AimbotBox:AddSlider("FOVRadius",{Text="FOV Radius",Min=20,Max=400,Default=100,
     Callback=function(v) fovCircle.Radius=v end})
@@ -94,15 +92,6 @@ AimbotBox:AddSlider("Smoothness",{
     Default=0.15,
     Rounding=2,
     Callback=function(v) Smoothness=v end
-})
-
-AimbotBox:AddSlider("FireRate",{
-    Text="Fire Rate (seconds)",
-    Min=0.01,
-    Max=0.2,
-    Default=0.05,
-    Rounding=3,
-    Callback=function(v) fireRate=v end
 })
 
 AimbotBox:AddSlider("RecoilReduction",{
@@ -204,31 +193,6 @@ RunService.RenderStepped:Connect(function()
         lastCamLook = Camera.CFrame.LookVector
     else
         lastCamLook = Camera.CFrame.LookVector
-    end
-end)
-
-local lastFireTick = 0
-
-RunService.Heartbeat:Connect(function()
-    if not Toggles.RapidFire.Value then return end
-    if isMenuOpen then return end
-    if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then return end
-    
-    local now = tick()
-    if now - lastFireTick < fireRate then return end
-    lastFireTick = now
-
-    if mouse1click then
-        mouse1click()
-    else
-        local pos = UIS:GetMouseLocation()
-        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-    end
-    
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        tool:Activate()
     end
 end)
 

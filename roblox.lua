@@ -57,7 +57,7 @@ local MainBox = Tabs.Main:AddLeftGroupbox("Combat")
 MainBox:AddToggle("Aimbot",{Text="Aimbot", Default=false})
 MainBox:AddToggle("TeamCheck",{Text="Team Check",Default=false})
 MainBox:AddToggle("WallCheck",{Text="Wall Check",Default=true})
-MainBox:AddToggle("FOVCircle",{Text="FOV Circle",Default=true})
+MainBox:AddToggle("FOVCircle",{Text="FOV Circle",Default=false})
 MainBox:AddToggle("LockFOV",{Text="Lock FOV To Center",Default=true})
 MainBox:AddToggle("EnableHitbox",{Text="Hitbox Expander"})
 MainBox:AddToggle("NoRecoil",{Text="No Recoil"})
@@ -103,7 +103,7 @@ AimbotBox:AddSlider("RecoilReduction",{
     Callback=function(v) end
 })
 
-MainBox:AddSlider("HitboxSize",{Text="Hitbox Size",Min=2,Max=100,Default=10,
+MainBox:AddSlider("HitboxSize",{Text="Hitbox Size",Min=2,Max=100,Default=50,
     Callback=function(v) hitboxSize=v end})
 
 MainBox:AddSlider("HitboxTransparency",{
@@ -145,6 +145,9 @@ local function GetClosest()
     for _,plr in pairs(Players:GetPlayers()) do
         if plr~=LocalPlayer and plr.Character then
             if IsTeammate(plr) then continue end
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+            
             local part = GetPart(plr.Character,Options.TargetPart.Value)
             if part and IsVisible(part) then
                 local pos,vis = Camera:WorldToViewportPoint(part.Position)
@@ -200,14 +203,14 @@ local stored = {}
 local heartbeatFrame = 0
 local ammoCache = {}
 
-local function ScanAmmo(container)
+local function ScanWeaponValues(container)
     if not container then return end
     for _, item in pairs(container:GetChildren()) do
         if item:IsA("Tool") or item:IsA("Model") then
             for _, v in pairs(item:GetDescendants()) do
                 if (v:IsA("IntValue") or v:IsA("NumberValue")) then
                     local n = v.Name:lower()
-                    if n:find("ammo") or n:find("bullet") or n:find("clip") or n:find("mag") or n:find("round") then
+                    if Toggles.InfiniteAmmo.Value and (n:find("ammo") or n:find("bullet") or n:find("clip") or n:find("mag") or n:find("round")) then
                         if not ammoCache[v] then
                             if v.Value > 0 then ammoCache[v] = v.Value end
                         elseif v.Value < ammoCache[v] then
@@ -228,7 +231,10 @@ RunService.Heartbeat:Connect(function()
         local root = plr.Character:FindFirstChild("HumanoidRootPart")
         if not root then continue end
 
-        if Toggles.EnableHitbox.Value and not IsTeammate(plr) then
+        local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+        local isAlive = hum and hum.Health > 0 and hum:GetState() ~= Enum.HumanoidStateType.Dead
+
+        if Toggles.EnableHitbox.Value and not IsTeammate(plr) and isAlive then
             if not stored[plr] or stored[plr].Part ~= root then
                 if stored[plr] and stored[plr].Part and stored[plr].Part.Parent then
                     stored[plr].Part.Size = stored[plr].Size
@@ -244,7 +250,8 @@ RunService.Heartbeat:Connect(function()
                     Size = root.Size,
                     Transparency = root.Transparency,
                     Material = root.Material,
-                    Color = root.Color
+                    Color = root.Color,
+                    CanCollide = root.CanCollide
                 }
             end
 
@@ -265,23 +272,39 @@ RunService.Heartbeat:Connect(function()
                 box.Parent = root
             end
         else
+            if not isAlive then
+                stored[plr] = nil
+            end
+            
             if stored[plr] then
                 if stored[plr].Part and stored[plr].Part.Parent then
                     stored[plr].Part.Size = stored[plr].Size
                     stored[plr].Part.Transparency = stored[plr].Transparency
                     stored[plr].Part.Material = stored[plr].Material
                     stored[plr].Part.Color = stored[plr].Color
+                    if stored[plr].CanCollide ~= nil then stored[plr].Part.CanCollide = stored[plr].CanCollide end
                     local box = stored[plr].Part:FindFirstChild("HitboxOutline_VH")
                     if box then box:Destroy() end
                 end
                 stored[plr] = nil
             end
+
+            if root then
+                local b = root:FindFirstChild("HitboxOutline_VH")
+                if b then b:Destroy() end
+            end
+            
+            if not isAlive and plr.Character then
+                pcall(function()
+                    plr.Character:Destroy()
+                end)
+            end
         end
     end
 
-    if heartbeatFrame % 6 == 0 and Toggles.InfiniteAmmo.Value then
-        ScanAmmo(LocalPlayer.Character)
-        ScanAmmo(LocalPlayer:FindFirstChild("Backpack"))
+    if heartbeatFrame % 6 == 0 then
+        ScanWeaponValues(LocalPlayer.Character)
+        ScanWeaponValues(LocalPlayer:FindFirstChild("Backpack"))
     end
 end)
 
@@ -322,7 +345,10 @@ Players.PlayerRemoving:Connect(function(p) RemoveESPDrawing(p) end)
 
 RunService.RenderStepped:Connect(function()
     for plr, text in pairs(espDrawings) do
-        if not Toggles.ESPEnabled.Value or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") or IsTeammate(plr) then
+        local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+        local isAlive = hum and hum.Health > 0
+        
+        if not Toggles.ESPEnabled.Value or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") or IsTeammate(plr) or not isAlive then
             text.Visible = false
         else
             local hrp = plr.Character.HumanoidRootPart

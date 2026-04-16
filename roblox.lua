@@ -62,7 +62,7 @@ MainBox:AddToggle("WallCheck",{Text="Wall Check",Default=true})
 MainBox:AddToggle("FOVCircle",{Text="FOV Circle",Default=false})
 MainBox:AddToggle("LockFOV",{Text="Lock FOV To Center",Default=true})
 MainBox:AddToggle("EnableHitbox",{Text="Hitbox Expander"})
-MainBox:AddToggle("NoRecoil",{Text="No Recoil"})
+MainBox:AddToggle("CameraNoRecoil",{Text="Camera No Recoil"})
 MainBox:AddToggle("InfiniteAmmo",{Text="Infinite Ammo"})
 
 MainBox:AddDropdown("TargetPart",{
@@ -96,8 +96,8 @@ AimbotBox:AddSlider("Smoothness",{
     Callback=function(v) Smoothness=v end
 })
 
-AimbotBox:AddSlider("RecoilReduction",{
-    Text="Recoil Reduction %",
+AimbotBox:AddSlider("CameraRecoilReduction",{
+    Text="Cam Recoil Reduction %",
     Min=0,
     Max=100,
     Default=80,
@@ -116,6 +116,10 @@ MainBox:AddSlider("HitboxTransparency",{
     Rounding=2,
     Callback=function(v) hitboxTransparency=v end
 })
+
+MainBox:AddSlider("RecoilMod1", {Text="Recoil/Spread Float Mod", Min=1, Max=10, Default=1})
+MainBox:AddSlider("RecoilMod2", {Text="Recoil/Spread Max Mod", Min=1, Max=100, Default=1})
+MainBox:AddSlider("RecoilMod3", {Text="Recoil/Spread MinMax Mod", Min=1, Max=10, Default=1})
 
 local function IsTeammate(plr)
     if not Toggles.TeamCheck.Value then return false end
@@ -186,20 +190,18 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    if Toggles.NoRecoil.Value then
+    if Toggles.CameraNoRecoil and Toggles.CameraNoRecoil.Value then
         if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) and lastCamLook then
             local delta = UIS:GetMouseDelta()
-            if delta.Magnitude < 2 then
-                local reduction = (Options.RecoilReduction.Value or 80) / 100
-                local current = Camera.CFrame.LookVector
-                local stabilized = lastCamLook:Lerp(current, 1 - reduction)
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + stabilized)
-            end
+            local releaseMult = math.clamp(1 - (delta.Magnitude / 10), 0, 1)
+            local reduction = ((Options.CameraRecoilReduction.Value or 80) / 100) * releaseMult
+            
+            local current = Camera.CFrame.LookVector
+            local stabilized = lastCamLook:Lerp(current, 1 - reduction)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + stabilized)
         end
-        lastCamLook = Camera.CFrame.LookVector
-    else
-        lastCamLook = Camera.CFrame.LookVector
     end
+    lastCamLook = Camera.CFrame.LookVector
 
     if Toggles.SpinBot and Toggles.SpinBot.Value and LocalPlayer.Character then
         local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -533,7 +535,34 @@ UnloadBox:AddButton("Unload & Exit", function()
         workspace.CurrentCamera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     end
 
+    pcall(function() if oldRandom then hookfunction(math.random, oldRandom) end end)
     Library:Unload()
+end)
+local oldRandom
+oldRandom = hookfunction(math.random, function(...)
+    if not (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) then
+        return oldRandom(...)
+    end
+
+    local args = {...}
+    
+    if args[1] == nil then
+        local div = (Options.RecoilMod1 and Options.RecoilMod1.Value) or 1
+        return oldRandom() / div
+    end
+
+    if args[2] == nil then
+        local div = (Options.RecoilMod2 and Options.RecoilMod2.Value) or 1
+        local upper = args[1] / div
+        return oldRandom(math.max(1, math.floor(upper)))
+    end
+
+    local div = (Options.RecoilMod3 and Options.RecoilMod3.Value) or 1
+    local lower = args[1] / div
+    local upper = args[2] / div
+    
+    if lower > upper then lower, upper = upper, lower end
+    return oldRandom(math.floor(lower), math.max(math.floor(lower), math.floor(upper)))
 end)
 
 ThemeManager:SetLibrary(Library)

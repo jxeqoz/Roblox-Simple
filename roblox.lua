@@ -214,7 +214,6 @@ local stored = {}
 local heartbeatFrame = 0
 local ammoCache = {}
 local ammoValues = {}
-local createdBoxes = {}
 
 local function CollectAmmo(container)
     if not container then return end
@@ -282,7 +281,7 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                 box.Color3 = Color3.fromRGB(0, 255, 0)
                 box.Transparency = 0
                 box.Parent = root
-                table.insert(createdBoxes, box)
+                game:GetService("CollectionService"):AddTag(box, "MyHitbox_VH")
             end
         else
             if not isAlive then
@@ -330,9 +329,8 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
     end
 
     if heartbeatFrame % 6 == 0 then
-        local activeBoxes = {}
-        for _, box in pairs(createdBoxes) do
-            if box and box.Parent and box.Adornee then
+        for _, box in pairs(game:GetService("CollectionService"):GetTagged("MyHitbox_VH")) do
+            if box and box.Adornee then
                 local isPlayer = false
                 if box.Adornee.Parent then
                     for _, p in pairs(Players:GetPlayers()) do
@@ -351,12 +349,9 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                         box.Adornee.Transparency = 1
                         box:Destroy()
                     end)
-                else
-                    table.insert(activeBoxes, box)
                 end
             end
         end
-        createdBoxes = activeBoxes
     end
 end))
 

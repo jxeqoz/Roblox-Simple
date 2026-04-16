@@ -255,7 +255,15 @@ RunService.Heartbeat:Connect(function()
                 }
             end
 
-            root.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+            local activeSize = hitboxSize
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if dist < (activeSize / 2) + 2 then
+                    activeSize = math.max(2, (dist - 2) * 2)
+                end
+            end
+
+            root.Size = Vector3.new(activeSize, activeSize, activeSize)
             root.Transparency = hitboxTransparency
             root.Material = Enum.Material.Neon
             root.Color = Color3.fromRGB(0, 255, 0)
@@ -305,6 +313,29 @@ RunService.Heartbeat:Connect(function()
     if heartbeatFrame % 6 == 0 then
         ScanWeaponValues(LocalPlayer.Character)
         ScanWeaponValues(LocalPlayer:FindFirstChild("Backpack"))
+        
+        for _, box in pairs(workspace:GetDescendants()) do
+            if box.Name == "HitboxOutline_VH" and box.Adornee then
+                local isPlayer = false
+                if box.Adornee.Parent then
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p.Character == box.Adornee.Parent then
+                            isPlayer = true
+                            break
+                        end
+                    end
+                end
+                if not isPlayer then
+                    pcall(function()
+                        box.Adornee.Size = Vector3.new(0, 0, 0)
+                        box.Adornee.CanCollide = false
+                        box.Adornee.CanQuery = false
+                        box.Adornee.Transparency = 1
+                        box:Destroy()
+                    end)
+                end
+            end
+        end
     end
 end)
 

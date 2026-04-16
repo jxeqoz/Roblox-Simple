@@ -114,7 +114,7 @@ AimbotBox:AddSlider("RecoilReduction",{
     Callback=function(v) end
 })
 
-MainBox:AddSlider("HitboxSize",{Text="Hitbox Size",Min=2,Max=50,Default=10,
+MainBox:AddSlider("HitboxSize",{Text="Hitbox Size",Min=2,Max=100,Default=10,
     Callback=function(v) hitboxSize=v end})
 
 MainBox:AddSlider("HitboxTransparency",{

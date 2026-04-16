@@ -14,6 +14,8 @@ local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
+local scriptConnections = {}
+
 local Window = Library:CreateWindow({
     Title = "RobloxSimple",
     Footer = "github.com/jxeqoz",
@@ -162,8 +164,9 @@ local function GetClosest()
 end
 
 local lastCamLook
+local spinAngle = 0
 
-RunService.RenderStepped:Connect(function()
+table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     fovCircle.Visible = Toggles.FOVCircle.Value
     fovCircle.Position = Toggles.LockFOV.Value
         and Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -197,25 +200,34 @@ RunService.RenderStepped:Connect(function()
     else
         lastCamLook = Camera.CFrame.LookVector
     end
-end)
+
+    if Toggles.SpinBot and Toggles.SpinBot.Value and LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            spinAngle = spinAngle + math.rad(Options.SpinSpeed.Value)
+            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, spinAngle, 0)
+        end
+    end
+end))
 
 local stored = {}
 local heartbeatFrame = 0
 local ammoCache = {}
 
-local function ScanWeaponValues(container)
+local ammoValues = {}
+
+local function CollectAmmo(container)
     if not container then return end
     for _, item in pairs(container:GetChildren()) do
         if item:IsA("Tool") or item:IsA("Model") then
             for _, v in pairs(item:GetDescendants()) do
                 if (v:IsA("IntValue") or v:IsA("NumberValue")) then
                     local n = v.Name:lower()
-                    if Toggles.InfiniteAmmo.Value and (n:find("ammo") or n:find("bullet") or n:find("clip") or n:find("mag") or n:find("round")) then
-                        if not ammoCache[v] then
-                            if v.Value > 0 then ammoCache[v] = v.Value end
-                        elseif v.Value < ammoCache[v] then
-                            v.Value = ammoCache[v]
+                    if n:find("ammo") or n:find("bullet") or n:find("clip") or n:find("mag") or n:find("round") then
+                        if not ammoCache[v] and v.Value > 0 then
+                            ammoCache[v] = v.Value
                         end
+                        ammoValues[v] = true
                     end
                 end
             end
@@ -223,7 +235,7 @@ local function ScanWeaponValues(container)
     end
 end
 
-RunService.Heartbeat:Connect(function()
+table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
     heartbeatFrame = heartbeatFrame + 1
 
     for _, plr in pairs(Players:GetPlayers()) do
@@ -255,15 +267,7 @@ RunService.Heartbeat:Connect(function()
                 }
             end
 
-            local activeSize = hitboxSize
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                if dist < (activeSize / 2) + 2 then
-                    activeSize = math.max(2, (dist - 2) * 2)
-                end
-            end
-
-            root.Size = Vector3.new(activeSize, activeSize, activeSize)
+            root.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
             root.Transparency = hitboxTransparency
             root.Material = Enum.Material.Neon
             root.Color = Color3.fromRGB(0, 255, 0)
@@ -310,10 +314,21 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
+    if Toggles.InfiniteAmmo and Toggles.InfiniteAmmo.Value then
+        for v in pairs(ammoValues) do
+            if ammoCache[v] and v.Value < ammoCache[v] then
+                v.Value = ammoCache[v]
+            end
+        end
+    end
+
+    if heartbeatFrame % 30 == 0 then
+        table.clear(ammoValues)
+        CollectAmmo(LocalPlayer.Character)
+        CollectAmmo(LocalPlayer:FindFirstChild("Backpack"))
+    end
+
     if heartbeatFrame % 6 == 0 then
-        ScanWeaponValues(LocalPlayer.Character)
-        ScanWeaponValues(LocalPlayer:FindFirstChild("Backpack"))
-        
         for _, box in pairs(workspace:GetDescendants()) do
             if box.Name == "HitboxOutline_VH" and box.Adornee then
                 local isPlayer = false
@@ -337,9 +352,9 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end
-end)
+end))
 
-Players.PlayerRemoving:Connect(function(plr) stored[plr] = nil end)
+table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr) stored[plr] = nil end))
 
 local VisualsBox = Tabs.Visuals:AddLeftGroupbox("ESP")
 
@@ -369,12 +384,12 @@ end
 for _, p in pairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then CreateESPDrawing(p) end
 end
-Players.PlayerAdded:Connect(function(p)
+table.insert(scriptConnections, Players.PlayerAdded:Connect(function(p)
     if p ~= LocalPlayer then CreateESPDrawing(p) end
-end)
-Players.PlayerRemoving:Connect(function(p) RemoveESPDrawing(p) end)
+end))
+table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(p) RemoveESPDrawing(p) end))
 
-RunService.RenderStepped:Connect(function()
+table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     for plr, text in pairs(espDrawings) do
         local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
         local isAlive = hum and hum.Health > 0
@@ -399,7 +414,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
+end))
 
 local MoveBox = Tabs.Visuals:AddRightGroupbox("Movement")
 local noclipConn
@@ -424,12 +439,12 @@ MoveBox:AddToggle("InfJump",{Text="Infinite Jump"}):OnChanged(function(v)
     infJump = v
 end)
 
-UIS.JumpRequest:Connect(function()
+table.insert(scriptConnections, UIS.JumpRequest:Connect(function()
     if infJump and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then hum:ChangeState("Jumping") end
     end
-end)
+end))
 
 MoveBox:AddSlider("Speed",{Text="WalkSpeed",Min=16,Max=100,Default=16,
     Callback=function(v)
@@ -438,6 +453,15 @@ MoveBox:AddSlider("Speed",{Text="WalkSpeed",Min=16,Max=100,Default=16,
             if hum then hum.WalkSpeed=v end
         end
     end})
+
+MoveBox:AddToggle("SpinBot",{Text="SpinBot"}):OnChanged(function(v)
+    if LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.AutoRotate = not v end
+    end
+end)
+
+MoveBox:AddSlider("SpinSpeed", {Text="Spin Speed", Min=10, Max=200, Default=50})
 
 local PlayerBox = Tabs.Player:AddLeftGroupbox("Players")
 
@@ -470,6 +494,46 @@ PlayerBox:AddButton({Text="Teleport to Player",Func=function()
         LocalPlayer.Character:SetPrimaryPartCFrame(target.Character.HumanoidRootPart.CFrame)
     end
 end})
+
+local UnloadBox = Tabs.Settings:AddRightGroupbox("System Operations")
+
+UnloadBox:AddButton("Unload & Exit", function()
+    for _, conn in pairs(scriptConnections) do
+        if conn and conn.Connected then conn:Disconnect() end
+    end
+    table.clear(scriptConnections)
+    
+    if noclipConn then noclipConn:Disconnect() end
+    
+    if fovCircle then fovCircle:Remove() end
+    for plr, data in pairs(stored) do
+        if data.Part and data.Part.Parent then
+            data.Part.Size = data.Size
+            data.Part.Transparency = data.Transparency
+            data.Part.Material = data.Material
+            data.Part.Color = data.Color
+            if data.CanCollide ~= nil then data.Part.CanCollide = data.CanCollide end
+            local box = data.Part:FindFirstChild("HitboxOutline_VH")
+            if box then box:Destroy() end
+        end
+    end
+    table.clear(stored)
+
+    for _, box in pairs(workspace:GetDescendants()) do
+        if box:IsA("SelectionBox") and box.Name == "HitboxOutline_VH" then box:Destroy() end
+    end
+    
+    for _, draw in pairs(espDrawings) do
+        if draw then draw:Remove() end
+    end
+    table.clear(espDrawings)
+    
+    if workspace.CurrentCamera then
+        workspace.CurrentCamera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    end
+
+    Library:Unload()
+end)
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
